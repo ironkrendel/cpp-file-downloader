@@ -9,6 +9,11 @@ add_library(cfdLogger STATIC include/cfd/Logger.h src/cfdLogger.cpp)
 target_include_directories(cfdLogger PUBLIC include)
 set_property(TARGET cfdLogger PROPERTY CXX_STANDARD 11)
 
+add_library(cfdURLParser STATIC include/cfd/URLParser.h src/cfdURLParser.cpp)
+target_include_directories(cfdURLParser PUBLIC include)
+set_property(TARGET cfdURLParser PROPERTY CXX_STANDARD 11)
+
 add_executable(cppdownloader apps/cppdownloader.cpp)
 target_link_libraries(cppdownloader PRIVATE cfdLogger)
+target_link_libraries(cppdownloader PRIVATE cfdURLParser)
 set_property(TARGET cppdownloader PROPERTY CXX_STANDARD 11)
