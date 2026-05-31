@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <vector>
+#include <filesystem>
 
 namespace logger = cfd::logger;
 namespace link_parser = cfd::URLParser;
@@ -37,6 +38,11 @@ int main(const int argc, const char * argv[])
             logger::Log(url_file_line_buffer);
             urls.push_back(link_parser::ParseURL(url_file_line_buffer));
         }
+    }
+
+    if (!std::filesystem::is_directory(argv[2]))
+    {
+        std::filesystem::create_directories(argv[2]);
     }
 
     return 0;
