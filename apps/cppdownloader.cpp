@@ -54,9 +54,9 @@ int main(const int argc, const char * argv[])
     std::vector<long> excluded_indices;
     for (long i = 0;i < files.size();i++)
     {
-        files[i].connect();
         try
         {
+            files[i].connect();
             files[i].get_info();
         }
         catch (std::exception& e)
@@ -71,6 +71,12 @@ int main(const int argc, const char * argv[])
         excluded_indices.pop_back();
     }
 
+    for (auto& file : files)
+    {
+        file.create_file(argv[2]);
+    }
+
+    std::vector<bool> file_crashed(files.size(), false);
     bool all_done = false;
     while (!all_done)
     {
@@ -78,13 +84,22 @@ int main(const int argc, const char * argv[])
         std::size_t concurrent_files = 0;
         for (int i = 0;i < files.size() && concurrent_files < max_concurrent_files;i++)
         {
-            if (files[i].is_complete())
+            if (files[i].is_complete() || file_crashed[i])
             {
                 continue;
             }
 
+            try
+            {
+                files[i].read_some();
+            }
+            catch (std::exception& e)
+            {
+                logger::LogError(files[i].get_url_target().filename + " " + e.what());
+                file_crashed[i] = true;
+                continue;
+            }
             concurrent_files++;
-            files[i].read_some();
 
             if (!files[i].is_complete())
             {
@@ -93,7 +108,7 @@ int main(const int argc, const char * argv[])
         }
     }
 
-
+    logger::Log("Download complete.");
 
     return 0;
 }

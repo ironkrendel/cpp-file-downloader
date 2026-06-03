@@ -1,7 +1,9 @@
 #include "cfd/File.h"
+#include "cfd/Logger.h"
 
 #include <boost/beast/version.hpp>
 #include <iostream>
+#include <filesystem>
 
 cfd::file::File::File(const cfd::URLParser::URLTarget& target) : target(target), ctx(boost::asio::ssl::context::tlsv12_client), resolver(ioc)
 {
@@ -15,11 +17,16 @@ cfd::file::File::File(const File& file) : target(file.target), ctx(boost::asio::
 
 cfd::file::File::File(File&& file) : target(std::move(file.target)), ctx(boost::asio::ssl::context::tlsv12_client), resolver(ioc)
 {
-
+    ctx.set_verify_mode(boost::asio::ssl::context::verify_none);
 }
 
 cfd::file::File::~File()
 {
+    if (outfile.is_open())
+    {
+        outfile.close();
+    }
+
     boost::beast::error_code ec;
     ec = stream.shutdown(ec);
 }
@@ -96,9 +103,36 @@ void cfd::file::File::get_info()
     }
 }
 
-void cfd::file::File::create_file()
+void cfd::file::File::create_file(const std::string& folder_path)
 {
+    bool filename_available = true;
+    std::size_t additional_index = 0;
+    do
+    {
+        filename_available = true;
+        for (const auto& file : std::filesystem::directory_iterator(folder_path))
+        {
+            std::string final_filename = target.filename;
+            if (additional_index)
+            {
+                final_filename += "(" + std::to_string(additional_index) + ")";
+            }
+            if (file.path().filename().string() == final_filename)
+            {
+                filename_available = false;
+                additional_index++;
+                break;
+            }
+        }
+    } while (!filename_available);
 
+    if (additional_index)
+    {
+        target.filename += "(" + std::to_string(additional_index) + ")";
+    }
+
+    std::filesystem::path final_path = std::filesystem::path(folder_path) / std::filesystem::path(target.filename);
+    outfile.open(final_path);
 }
 
 void cfd::file::File::read_some()
@@ -129,10 +163,15 @@ void cfd::file::File::read_some()
     response_parser.get().body().data = buf;
     response_parser.get().body().size = sizeof(buf);
 
-    read_bytes += boost::beast::http::read_some(stream, response_buffer, response_parser);
+    std::size_t chunk_size = boost::beast::http::read_some(stream, response_buffer, response_parser);
+    read_bytes += chunk_size;
+
+    outfile.write(buf, chunk_size);
 
     if (response_parser.is_done())
     {
+        outfile.close();
+        cfd::logger::Log(target.filename + " is done.");
         download_complete = true;
     }
 }

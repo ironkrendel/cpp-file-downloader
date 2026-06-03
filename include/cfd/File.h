@@ -46,7 +46,8 @@ namespace cfd
 
             void connect();
             void get_info();
-            void create_file();
+            bool sanitize_name();
+            void create_file(const std::string& folder_path);
             void read_some();
             float get_progress();
             bool is_complete();
