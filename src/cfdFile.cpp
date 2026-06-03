@@ -13,7 +13,7 @@ cfd::file::File::File(const File& file) : target(file.target), ctx(boost::asio::
     ctx.set_verify_mode(boost::asio::ssl::context::verify_none);
 }
 
-cfd::file::File::File(File&& file) noexcept : target(std::move(file.target)), ctx(boost::asio::ssl::context::tlsv12_client), resolver(ioc)
+cfd::file::File::File(File&& file) : target(std::move(file.target)), ctx(boost::asio::ssl::context::tlsv12_client), resolver(ioc)
 {
 
 }
@@ -33,7 +33,7 @@ cfd::file::File& cfd::file::File::operator=(const File& file)
     return *this;
 }
 
-cfd::file::File& cfd::file::File::operator=(File&& file) noexcept
+cfd::file::File& cfd::file::File::operator=(File&& file)
 {
     target = std::move(file.target);
     ctx = boost::asio::ssl::context(boost::asio::ssl::context::tlsv12_client);
@@ -94,4 +94,55 @@ void cfd::file::File::get_info()
             }
         }
     }
+}
+
+void cfd::file::File::create_file()
+{
+
+}
+
+void cfd::file::File::read_some()
+{
+    constexpr std::size_t buffer_size = 1024;
+
+    if (download_complete) return;
+
+    if (!get_request_initialized)
+    {
+        boost::beast::http::request<boost::beast::http::empty_body> request;
+        request.method(boost::beast::http::verb::get); // Ask for header only
+        request.target(target.target);
+        request.version(11); // HTTP version 1.1
+        request.set(boost::beast::http::field::host, target.host);
+        request.set(boost::beast::http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+        boost::beast::http::write(stream, request);
+
+        response_parser.body_limit(std::numeric_limits<std::size_t>::max());
+
+        boost::beast::http::read_header(stream, response_buffer, response_parser);
+
+        get_request_initialized = true;
+    }
+
+    char buf[buffer_size];
+    response_parser.get().body().data = buf;
+    response_parser.get().body().size = sizeof(buf);
+
+    read_bytes += boost::beast::http::read_some(stream, response_buffer, response_parser);
+
+    if (response_parser.is_done())
+    {
+        download_complete = true;
+    }
+}
+
+float cfd::file::File::get_progress()
+{
+    return static_cast<float>(read_bytes) / static_cast<float>(filesize);
+}
+
+bool cfd::file::File::is_complete()
+{
+    return read_bytes >= filesize;
 }

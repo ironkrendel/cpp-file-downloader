@@ -25,6 +25,8 @@ int main(const int argc, const char * argv[])
 
     logger::Log("C++ File Downloader starting");
 
+    const std::size_t max_concurrent_files = std::stoul(argv[3]);
+
     const std::string input_args_string = std::string(argv[1]) + " " + std::string(argv[2]) + " " + std::string(argv[3]);
     logger::Log(input_args_string);
 
@@ -68,6 +70,30 @@ int main(const int argc, const char * argv[])
         files.erase(files.begin() + excluded_indices.back());
         excluded_indices.pop_back();
     }
+
+    bool all_done = false;
+    while (!all_done)
+    {
+        all_done = true;
+        std::size_t concurrent_files = 0;
+        for (int i = 0;i < files.size() && concurrent_files < max_concurrent_files;i++)
+        {
+            if (files[i].is_complete())
+            {
+                continue;
+            }
+
+            concurrent_files++;
+            files[i].read_some();
+
+            if (!files[i].is_complete())
+            {
+                all_done = false;
+            }
+        }
+    }
+
+
 
     return 0;
 }
