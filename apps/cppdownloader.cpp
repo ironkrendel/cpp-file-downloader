@@ -109,8 +109,9 @@ int main(const int argc, const char * argv[])
                 all_done = false;
             }
         }
-        for (auto& file : files) {
-            if (!file.is_complete()) {
+        for (int i = 0;i < files.size();i++) 
+        {
+            if (!files[i].is_complete() && !file_crashed[i]) {
                 all_done = false;
             }
         }
