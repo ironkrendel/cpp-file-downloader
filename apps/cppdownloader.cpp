@@ -77,7 +77,7 @@ int main(const int argc, const char * argv[])
         file.create_file(argv[2]);
     }
 
-    logger::Log("Starting Download.");
+    logger::Log("Starting Download");
 
     std::vector<bool> file_crashed(files.size(), false);
     bool all_done = false;
@@ -109,9 +109,14 @@ int main(const int argc, const char * argv[])
                 all_done = false;
             }
         }
+        for (auto& file : files) {
+            if (!file.is_complete()) {
+                all_done = false;
+            }
+        }
     }
 
-    logger::Log("Download complete.");
+    logger::Log("Download complete");
 
     return 0;
 }
