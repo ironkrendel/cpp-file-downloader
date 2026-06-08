@@ -73,8 +73,11 @@ int main(const int argc, const char * argv[])
 
     for (auto& file : files)
     {
+        file.sanitize_name();
         file.create_file(argv[2]);
     }
+
+    logger::Log("Starting Download.");
 
     std::vector<bool> file_crashed(files.size(), false);
     bool all_done = false;

@@ -134,6 +134,24 @@ void cfd::file::File::get_info()
     }
 }
 
+void cfd::file::File::sanitize_name() {
+    std::string new_filename = "";
+    for (auto ch = target.filename.begin(); ch != target.filename.end(); ch++) 
+    {
+        if (*ch >= 0 && *ch <= 127) 
+        {
+            new_filename += *ch;
+        }
+        else {
+            if ((*ch & 0b11000000) == 0b11000000) 
+            {
+                new_filename += '_';
+            }
+        }
+    }
+    target.filename = new_filename;
+}
+
 void cfd::file::File::create_file(const std::string& folder_path)
 {
     bool filename_available = true;
