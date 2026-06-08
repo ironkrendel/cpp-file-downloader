@@ -5,19 +5,28 @@
 #include <iostream>
 #include <filesystem>
 
-cfd::file::File::File(const cfd::URLParser::URLTarget& target) : target(target), ctx(boost::asio::ssl::context::tlsv12_client), resolver(ioc)
+cfd::file::File::File(const cfd::URLParser::URLTarget& target) : target(target)
 {
-    ctx.set_verify_mode(boost::asio::ssl::context::verify_none);
+    ioc = std::make_unique<boost::beast::net::io_context>();
+
+    ctx = std::make_unique<boost::asio::ssl::context>(boost::asio::ssl::context::tlsv12_client);
+    (*ctx).set_verify_mode(boost::asio::ssl::context::verify_none);
+
+    resolver = std::make_unique<boost::beast::net::ip::tcp::resolver>(*ioc);
+
+    stream = std::make_unique<boost::asio::ssl::stream<boost::beast::tcp_stream>>(*ioc, *ctx);
+
+    buffer = std::make_unique<boost::beast::flat_buffer>();
 }
 
-cfd::file::File::File(const File& file) : target(file.target), ctx(boost::asio::ssl::context::tlsv12_client), resolver(ioc)
-{
-    ctx.set_verify_mode(boost::asio::ssl::context::verify_none);
-}
+// cfd::file::File::File(const File& file) : target(file.target), ctx(boost::asio::ssl::context::tlsv12_client), resolver(ioc)
+// {
+//     ctx.set_verify_mode(boost::asio::ssl::context::verify_none);
+// }
 
-cfd::file::File::File(File&& file) : target(std::move(file.target)), ctx(boost::asio::ssl::context::tlsv12_client), resolver(ioc)
+cfd::file::File::File(File&& file) : target(std::move(file.target)), filesize(std::move(file.filesize)), outfile(std::move(file.outfile)), ioc(std::move(file.ioc)), ctx(std::move(file.ctx)), resolver(std::move(file.resolver)), stream(std::move(file.stream)), buffer(std::move(file.buffer))
 {
-    ctx.set_verify_mode(boost::asio::ssl::context::verify_none);
+    
 }
 
 cfd::file::File::~File()
@@ -27,24 +36,32 @@ cfd::file::File::~File()
         outfile.close();
     }
 
-    boost::beast::error_code ec;
-    ec = stream.shutdown(ec);
+    if (stream != nullptr) {
+        boost::beast::error_code ec;
+        ec = (*stream).shutdown(ec);
+    }
 }
 
-cfd::file::File& cfd::file::File::operator=(const File& file)
-{
-    target = file.target;
-    ctx = boost::asio::ssl::context(boost::asio::ssl::context::tlsv12_client);
-    resolver = boost::beast::net::ip::tcp::resolver(ioc);
+// cfd::file::File& cfd::file::File::operator=(const File& file)
+// {
+//     target = file.target;
+//     ctx = boost::asio::ssl::context(boost::asio::ssl::context::tlsv12_client);
+//     resolver = boost::beast::net::ip::tcp::resolver(ioc);
 
-    return *this;
-}
+//     return *this;
+// }
 
 cfd::file::File& cfd::file::File::operator=(File&& file)
 {
     target = std::move(file.target);
-    ctx = boost::asio::ssl::context(boost::asio::ssl::context::tlsv12_client);
-    resolver = boost::beast::net::ip::tcp::resolver(ioc);
+    filesize = std::move(file.filesize);
+    outfile = std::move(file.outfile);
+
+    ioc = std::move(file.ioc);
+    ctx = std::move(file.ctx);
+    resolver = std::move(file.resolver);
+    stream = std::move(file.stream);
+    buffer = std::move(file.buffer);
 
     return *this;
 }
@@ -56,11 +73,11 @@ cfd::URLParser::URLTarget cfd::file::File::get_url_target() const
 
 void cfd::file::File::connect()
 {
-    boost::asio::ip::basic_resolver_results<boost::asio::ip::tcp> resolve_results = resolver.resolve(target.host, target.port);
+    boost::asio::ip::basic_resolver_results<boost::asio::ip::tcp> resolve_results = (*resolver).resolve(target.host, target.port);
 
-    boost::beast::get_lowest_layer(stream).connect(resolve_results);
+    boost::beast::get_lowest_layer(*stream).connect(resolve_results);
 
-    stream.handshake(boost::asio::ssl::stream_base::client);
+    (*stream).handshake(boost::asio::ssl::stream_base::client);
 }
 
 void cfd::file::File::get_info()
@@ -72,13 +89,13 @@ void cfd::file::File::get_info()
     request.set(boost::beast::http::field::host, target.host);
     request.set(boost::beast::http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 
-    boost::beast::http::write(stream, request);
+    boost::beast::http::write(*stream, request);
 
     boost::beast::http::response_parser<boost::beast::http::empty_body> response_parser;
     response_parser.skip(true); // Skip body
 
     boost::beast::flat_buffer response_buffer;
-    boost::beast::http::read_header(stream, response_buffer, response_parser);
+    boost::beast::http::read_header(*stream, response_buffer, response_parser);
 
     if (response_parser.get().result_int() != 200)
     {
@@ -150,11 +167,11 @@ void cfd::file::File::read_some()
         request.set(boost::beast::http::field::host, target.host);
         request.set(boost::beast::http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 
-        boost::beast::http::write(stream, request);
+        boost::beast::http::write(*stream, request);
 
         response_parser.body_limit(std::numeric_limits<std::size_t>::max());
 
-        boost::beast::http::read_header(stream, response_buffer, response_parser);
+        boost::beast::http::read_header(*stream, response_buffer, response_parser);
 
         get_request_initialized = true;
     }
@@ -163,7 +180,7 @@ void cfd::file::File::read_some()
     response_parser.get().body().data = buf;
     response_parser.get().body().size = sizeof(buf);
 
-    std::size_t chunk_size = boost::beast::http::read_some(stream, response_buffer, response_parser);
+    std::size_t chunk_size = boost::beast::http::read_some(*stream, response_buffer, response_parser);
     read_bytes += chunk_size;
 
     outfile.write(buf, chunk_size);

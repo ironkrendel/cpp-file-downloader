@@ -8,6 +8,7 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl.hpp>
 #include <fstream>
+#include <memory>
 
 namespace cfd
 {
@@ -20,11 +21,11 @@ namespace cfd
             std::size_t read_bytes = 0;
             bool download_complete = false;
 
-            boost::beast::net::io_context ioc;
-            boost::asio::ssl::context ctx;
-            boost::beast::net::ip::tcp::resolver resolver;
-            boost::asio::ssl::stream<boost::beast::tcp_stream> stream = boost::asio::ssl::stream<boost::beast::tcp_stream>(ioc, ctx);
-            boost::beast::flat_buffer buffer;
+            std::unique_ptr<boost::beast::net::io_context> ioc;
+            std::unique_ptr<boost::asio::ssl::context> ctx;
+            std::unique_ptr<boost::beast::net::ip::tcp::resolver> resolver;
+            std::unique_ptr<boost::asio::ssl::stream<boost::beast::tcp_stream>> stream;
+            std::unique_ptr<boost::beast::flat_buffer> buffer;
 
             std::ofstream outfile;
 
@@ -35,11 +36,11 @@ namespace cfd
         public:
             File() = delete;
             File(const URLParser::URLTarget& target);
-            File(const File& file);
+            File(const File& file) = delete;
             File(File&& file);
             ~File();
 
-            File& operator=(const File& file);
+            File& operator=(const File& file) = delete;
             File& operator=(File&& file);
 
             URLParser::URLTarget get_url_target() const;
