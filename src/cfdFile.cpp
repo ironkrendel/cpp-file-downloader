@@ -77,7 +77,10 @@ void cfd::file::File::connect()
 
     boost::beast::get_lowest_layer(*stream).connect(resolve_results);
 
-    (*stream).handshake(boost::asio::ssl::stream_base::client);
+    if (target.port == "443") 
+    {
+        (*stream).handshake(boost::asio::ssl::stream_base::client);
+    }
 }
 
 void cfd::file::File::get_info()
@@ -89,13 +92,24 @@ void cfd::file::File::get_info()
     request.set(boost::beast::http::field::host, target.host);
     request.set(boost::beast::http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 
-    boost::beast::http::write(*stream, request);
+    if (target.port == "443") {
+        boost::beast::http::write(*stream, request);
+    }
+    else {
+        boost::beast::http::write(boost::beast::get_lowest_layer(*stream), request);
+    }
+    
 
     boost::beast::http::response_parser<boost::beast::http::empty_body> response_parser;
     response_parser.skip(true); // Skip body
 
     boost::beast::flat_buffer response_buffer;
-    boost::beast::http::read_header(*stream, response_buffer, response_parser);
+    if (target.port == "443") {
+        boost::beast::http::read_header(*stream, response_buffer, response_parser);
+    }
+    else {
+        boost::beast::http::read_header(boost::beast::get_lowest_layer(*stream), response_buffer, response_parser);
+    }
 
     if (response_parser.get().result_int() != 200)
     {
@@ -167,11 +181,23 @@ void cfd::file::File::read_some()
         request.set(boost::beast::http::field::host, target.host);
         request.set(boost::beast::http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 
-        boost::beast::http::write(*stream, request);
+        if (target.port == "443") {
+            boost::beast::http::write(*stream, request);
+        }
+        else {
+            boost::beast::http::write(boost::beast::get_lowest_layer(*stream), request);
+        }
+        
 
         response_parser.body_limit(std::numeric_limits<std::size_t>::max());
 
-        boost::beast::http::read_header(*stream, response_buffer, response_parser);
+        if (target.port == "443") {
+            boost::beast::http::read_header(*stream, response_buffer, response_parser);
+        }
+        else {
+            boost::beast::http::read_header(boost::beast::get_lowest_layer(*stream), response_buffer, response_parser);
+        }
+        
 
         get_request_initialized = true;
     }
@@ -180,7 +206,14 @@ void cfd::file::File::read_some()
     response_parser.get().body().data = buf;
     response_parser.get().body().size = sizeof(buf);
 
-    std::size_t chunk_size = boost::beast::http::read_some(*stream, response_buffer, response_parser);
+    std::size_t chunk_size;
+    if (target.port == "443") {
+        chunk_size = boost::beast::http::read_some(*stream, response_buffer, response_parser);
+    }
+    else {
+        chunk_size = boost::beast::http::read_some(boost::beast::get_lowest_layer(*stream), response_buffer, response_parser);
+    }
+    
     read_bytes += chunk_size;
 
     outfile.write(buf, chunk_size);
