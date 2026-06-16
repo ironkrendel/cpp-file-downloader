@@ -1,10 +1,12 @@
-cmake_minimum_required(VERSION 3.5.1...4.0.0)
+cmake_minimum_required(VERSION 3.10...4.0.0)
 
 project(cpp-file-downloader LANGUAGES CXX)
 set(CPP_STANDARD 17)
 
 find_package(OpenSSL REQUIRED)
 find_package(Boost REQUIRED)
+
+add_subdirectory(tests)
 
 add_library(cfdLogger STATIC include/cfd/Logger.h src/cfdLogger.cpp)
 target_include_directories(cfdLogger PUBLIC include)
