@@ -125,11 +125,14 @@ void cfd::file::File::get_info()
         }
         else if (field.name_string() == "Content-Disposition" && field.value().find("attachment") != -1 && field.value().find("filename") != -1)
         {
-            target.filename = "";
+            std::string header_filename;
             for (auto it = (field.value().begin() + field.value().find("filename") + sizeof "filename='" - 1);it != field.value().end() && *it != '"'; it++)
             {
-                target.filename.push_back(*it);
+                header_filename += *it;
             }
+            auto split_header_filename = cfd::URLParser::SplitFilename(header_filename);
+            target.filename = split_header_filename.first;
+            target.extension = split_header_filename.second;
         }
     }
 }
@@ -166,6 +169,7 @@ void cfd::file::File::create_file(const std::string& folder_path)
             {
                 final_filename += "(" + std::to_string(additional_index) + ")";
             }
+            final_filename += target.extension;
             if (file.path().filename().string() == final_filename)
             {
                 filename_available = false;
@@ -180,7 +184,7 @@ void cfd::file::File::create_file(const std::string& folder_path)
         target.filename += "(" + std::to_string(additional_index) + ")";
     }
 
-    std::filesystem::path final_path = std::filesystem::path(folder_path) / std::filesystem::path(target.filename);
+    std::filesystem::path final_path = std::filesystem::path(folder_path) / std::filesystem::path(target.filename + target.extension);
     outfile.open(final_path);
 }
 

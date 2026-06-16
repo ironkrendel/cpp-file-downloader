@@ -13,8 +13,10 @@ namespace cfd
             std::string target;
             std::string port;
             std::string filename;
+            std::string extension;
         };
 
+        std::pair<std::string, std::string> SplitFilename(const std::string& filename);
         URLTarget ParseURL(const std::string& url);
     }
 }
